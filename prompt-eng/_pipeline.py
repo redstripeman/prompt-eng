@@ -58,7 +58,7 @@ def load_config():
                 os.environ[key.strip()] = value.strip()
 
 
-def create_payload(model, prompt, target="ollama", **kwargs):
+def create_payload(model, system_prompt, user_prompt, target="ollama", **kwargs):
     """
     Create the Request Payload in the format required byt the Model Server
     @NOTE: 
@@ -73,7 +73,7 @@ def create_payload(model, prompt, target="ollama", **kwargs):
     if target == "ollama":
         payload = {
             "model": model,
-            "prompt": prompt, 
+            "prompt": system_prompt, 
             "stream": False,
         }
         if kwargs:
@@ -86,7 +86,8 @@ def create_payload(model, prompt, target="ollama", **kwargs):
         '''
         payload = {
             "model": model,
-            "messages": [ {"role" : "user", "content": prompt } ]
+            "messages": [ {"role" : "system", "content": system_prompt },
+                          {"role" : "user", "content": user_prompt }]
         }
 
         # @NOTE: Taking not of the syntaxes we tested before; none seems to work so far 
@@ -119,7 +120,7 @@ def model_req(payload=None):
     if api_key: headers["Authorization"] = f"Bearer {api_key}"
 
     #print(url, headers)
-    print(payload)
+    #print(payload)
 
     # Send out request to Model Provider
     try:
@@ -160,12 +161,33 @@ def model_req(payload=None):
 
 if __name__ == "__main__":
     from _pipeline import create_payload, model_req
-    MESSAGE = "1 + 1"
-    PROMPT = MESSAGE 
+
+    try:
+        with open("system_prompt.txt", "r") as f:
+          sys_prompt = f.read().strip()  # Read from file and remove leading/trailing whitespace
+    except FileNotFoundError:
+        sys_prompt = "1 + 1"  # Default message if file not found
+        print("system_prompt.txt not found. Using default prompt.")
+    except Exception as e: # Catch other potential file reading errors
+        sys_prompt = "1 + 1"
+        print(f"Error reading system_prompt.txt: {e}. Using default prompt.")
+
+    try:
+        with open("user_prompt.txt", "r") as f:
+            usr_prompt = f.read().strip()  # Read user prompt from file
+    except FileNotFoundError:
+        usr_prompt = "Software Installation Guide"  # Empty user prompt if file not found
+        print("user_prompt.txt not found. Using default user prompt.")
+    except Exception as e:
+        usr_prompt = ""
+        print(f"Error reading user_prompt.txt: {e}. Using empty message.")
+
+
     payload = create_payload(
-                         target="open-webui",   
-                         model="llama3.2:latest", 
-                         prompt=PROMPT, 
+                         target="ollama",   
+                         model="qwen:0.5b", 
+                         system_prompt=sys_prompt,
+                         user_prompt = usr_prompt, 
                          temperature=1.0, 
                          num_ctx=5555555, 
                          num_predict=1)
@@ -173,3 +195,4 @@ if __name__ == "__main__":
     time, response = model_req(payload=payload)
     print(response)
     if time: print(f'Time taken: {time}s')
+
